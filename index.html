@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Orange TV">
+<title>Orange TV Remote</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --orange: #FF6600;
+    --orange-dim: rgba(255,102,0,0.15);
+    --orange-glow: rgba(255,102,0,0.4);
+    --bg: #0a0a0c;
+    --surface: #141418;
+    --surface2: #1e1e24;
+    --surface3: #2a2a32;
+    --text: #f0f0f5;
+    --text-dim: #7070a0;
+    --text-muted: #404060;
+    --border: rgba(255,255,255,0.06);
+    --radius: 18px;
+    --radius-sm: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overscroll-behavior: none;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 50% -10%, rgba(255,102,0,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 80% 100%, rgba(255,102,0,0.04) 0%, transparent 50%);
+    pointer-events: none; z-index: 0;
+  }
+  .app {
+    max-width: 390px; margin: 0 auto;
+    padding: 0 0 env(safe-area-inset-bottom, 20px);
+    position: relative; z-index: 1; min-height: 100dvh;
+  }
+
+  /* Header */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px 10px;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
+  }
+  .header-logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot {
+    width: 30px; height: 30px; background: var(--orange); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: white;
+    box-shadow: 0 0 16px var(--orange-glow);
+  }
+  .logo-text { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+  .logo-text span { color: var(--orange); }
+  .status-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 5px 12px;
+    font-size: 12px; font-weight: 500; color: var(--text-dim);
+    cursor: pointer; transition: all 0.2s;
+  }
+  .status-pill.connected { color: #4cde80; border-color: rgba(76,222,128,0.2); background: rgba(76,222,128,0.07); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
+  .status-pill.connected .status-dot { background: #4cde80; box-shadow: 0 0 6px #4cde80; }
+
+  /* Connect banner */
+  .connect-banner {
+    margin: 8px 16px; padding: 14px 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .connect-row { display: flex; align-items: center; gap: 8px; }
+  .connect-banner input {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 9px 13px; color: var(--text);
+    font-family: 'Outfit', sans-serif; font-size: 14px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .connect-banner input:focus { border-color: var(--orange); }
+  .connect-banner input::placeholder { color: var(--text-muted); }
+  .connect-btn {
+    background: var(--orange); color: white; border: none; border-radius: 10px;
+    padding: 9px 14px; font-family: 'Outfit', sans-serif;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    white-space: nowrap; transition: all 0.15s; flex-shrink: 0;
+  }
+  .connect-btn:active { transform: scale(0.95); opacity: 0.85; }
+  .scan-btn {
+    width: 100%; background: var(--surface2); border: 1px solid rgba(255,102,0,0.2);
+    border-radius: 10px; padding: 10px; font-family: 'Outfit', sans-serif;
+    font-size: 13px; font-weight: 600; color: var(--orange);
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px;
+    transition: all 0.15s;
+  }
+  .scan-btn:active { opacity: 0.7; transform: scale(0.98); }
+
+  /* Scan overlay */
+  .scan-overlay {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.88);
+    backdrop-filter: blur(10px);
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; padding: 24px;
+  }
+  .scan-overlay.active { display: flex; }
+  .scan-title { font-size: 18px; font-weight: 700; color: var(--text); }
+  .scan-sub { font-size: 13px; color: var(--text-dim); text-align: center; line-height: 1.7; }
+  .scan-progress {
+    width: 100%; max-width: 320px;
+    background: var(--surface2); border-radius: 8px; height: 5px; overflow: hidden;
+  }
+  .scan-bar {
+    height: 100%; background: var(--orange); border-radius: 8px;
+    width: 0%; transition: width 0.3s linear;
+  }
+  .scan-results {
+    width: 100%; max-width: 320px;
+    display: flex; flex-direction: column; gap: 8px;
+    max-height: 260px; overflow-y: auto;
+  }
+  .device-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .device-item:active { transform: scale(0.97); background: var(--surface2); }
+  .device-item.highlight { border-color: rgba(255,102,0,0.4); background: var(--orange-dim); }
+  .device-icon { font-size: 22px; }
+  .device-info { flex: 1; }
+  .device-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .device-ip { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .device-badge {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+    background: var(--orange); color: white;
+    border-radius: 6px; padding: 2px 7px;
+  }
+  .scan-cancel {
+    background: transparent; border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 28px;
+    color: var(--text-dim); font-family: 'Outfit', sans-serif;
+    font-size: 14px; font-weight: 500; cursor: pointer;
+  }
+
+  /* Remote */
+  .remote { padding: 12px 16px 0; display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+  .top-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .section-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 1.2px;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;
+  }
+  .btn {
+    display: flex; align-items: center; justify-content: center;
+    border: none; cursor: pointer; font-family: 'Outfit', sans-serif;
+    transition: all 0.12s; user-select: none;
+    position: relative; overflow: hidden;
+  }
+  .btn::after {
+    content: ''; position: absolute; inset: 0;
+    background: white; opacity: 0; transition: opacity 0.1s; border-radius: inherit;
+  }
+  .btn:active::after { opacity: 0.08; }
+  .btn:active { transform: scale(0.94); }
+  .btn-power {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: rgba(255,60,60,0.12); border: 1.5px solid rgba(255,60,60,0.25);
+    color: #ff5555; font-size: 20px;
+  }
+  .btn-power:active { background: rgba(255,60,60,0.25); transform: scale(0.9); }
+  .btn-vc {
+    width: 44px; height: 36px; border-radius: 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-size: 14px; font-weight: 600;
+  }
+  .dpad-container { display: flex; align-items: center; justify-content: center; }
+  .dpad {
+    display: grid;
+    grid-template-columns: 52px 64px 52px;
+    grid-template-rows: 52px 64px 52px;
+    gap: 3px;
+  }
+  .btn-dpad { border-radius: 50%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 16px; }
+  .btn-ok {
+    background: var(--orange-dim); border-color: rgba(255,102,0,0.25);
+    color: var(--orange); font-size: 13px; font-weight: 700;
+    letter-spacing: 0.5px; border-radius: 50%;
+  }
+  .btn-ok:active { background: rgba(255,102,0,0.3); }
+  .nav-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .btn-nav {
+    height: 46px; border-radius: var(--radius-sm);
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text-dim); font-size: 11px; font-weight: 600;
+    letter-spacing: 0.3px; flex-direction: column; gap: 3px;
+  }
+  .btn-nav.orange-tint { background: var(--orange-dim); border-color: rgba(255,102,0,0.2); color: var(--orange); }
+  .numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .btn-num {
+    height: 52px; border-radius: var(--radius-sm);
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-size: 20px; font-weight: 500;
+  }
+  .btn-num.muted { font-size: 13px; font-weight: 600; color: var(--text-dim); }
+  .color-keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .btn-color { height: 36px; border-radius: 10px; border: none; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; color: white; }
+  .btn-red    { background: #d0272a; }
+  .btn-green  { background: #1d8f3a; }
+  .btn-yellow { background: #c8880a; color: #1a0e00; }
+  .btn-blue   { background: #1856b0; }
+  .divider-label {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 2px;
+  }
+  .divider-label::before, .divider-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .toast {
+    position: fixed;
+    bottom: calc(env(safe-area-inset-bottom, 20px) + 12px);
+    left: 50%; transform: translateX(-50%) translateY(80px);
+    background: rgba(30,30,36,0.95); backdrop-filter: blur(12px);
+    border: 1px solid var(--border); border-radius: 20px;
+    padding: 9px 20px; font-size: 13px; font-weight: 500; color: var(--text-dim);
+    white-space: nowrap; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+    z-index: 100; opacity: 0; pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .help-note { text-align: center; font-size: 11px; color: var(--text-muted); padding: 8px 20px 20px; line-height: 1.6; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .scanning .scan-title { animation: pulse 1.4s ease infinite; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <div class="header-logo">
+      <div class="logo-dot">▶</div>
+      <div class="logo-text"><span>Orange</span> TV</div>
+    </div>
+    <div class="status-pill" id="statusPill" onclick="toggleConnect()">
+      <div class="status-dot"></div>
+      <span id="statusText">Non connecté</span>
+    </div>
+  </div>
+
+  <!-- Connection panel -->
+  <div class="connect-banner" id="connectBanner">
+    <button class="scan-btn" onclick="startScan()">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Détecter automatiquement ma box
+    </button>
+    <div class="connect-row">
+      <input type="text" id="boxIp" placeholder="Ou entrer l'IP manuellement…">
+      <button class="connect-btn" onclick="connectBox()">OK</button>
+    </div>
+  </div>
+
+  <!-- Scan overlay -->
+  <div class="scan-overlay" id="scanOverlay">
+    <div class="scan-title" id="scanTitle">🔍 Recherche en cours…</div>
+    <div class="scan-sub" id="scanSub">Analyse du réseau Wi-Fi local<br>Cela peut prendre ~15 secondes</div>
+    <div class="scan-progress"><div class="scan-bar" id="scanBar"></div></div>
+    <div class="scan-results" id="scanResults"></div>
+    <button class="scan-cancel" onclick="cancelScan()">Annuler</button>
+  </div>
+
+  <div class="remote">
+    <!-- Power + Vol + Chan -->
+    <div class="card top-row">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+        <div class="section-label">Alimentation</div>
+        <button class="btn btn-power" onclick="sendKey('STANDBY')">⏻</button>
+      </div>
+      <div style="display:flex;justify-content:space-around;align-items:center;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <div class="section-label">VOL</div>
+          <button class="btn btn-vc" onclick="sendKey('VOL_UP')">＋</button>
+          <button class="btn btn-vc" style="font-size:18px;" onclick="sendKey('MUTE')">🔇</button>
+          <button class="btn btn-vc" onclick="sendKey('VOL_DOWN')">－</button>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <div class="section-label">CHAÎNE</div>
+          <button class="btn btn-vc" onclick="sendKey('CH_UP')">▲</button>
+          <button class="btn btn-vc" style="font-size:11px;font-weight:700;" onclick="sendKey('BACK')">RET</button>
+          <button class="btn btn-vc" onclick="sendKey('CH_DOWN')">▼</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- D-Pad -->
+    <div class="card">
+      <div class="divider-label section-label">Navigation</div>
+      <div class="dpad-container">
+        <div class="dpad">
+          <div></div>
+          <button class="btn btn-dpad" onclick="sendKey('UP')">▲</button>
+          <div></div>
+          <button class="btn btn-dpad" onclick="sendKey('LEFT')">◀</button>
+          <button class="btn btn-dpad btn-ok" onclick="sendKey('OK')">OK</button>
+          <button class="btn btn-dpad" onclick="sendKey('RIGHT')">▶</button>
+          <div></div>
+          <button class="btn btn-dpad" onclick="sendKey('DOWN')">▼</button>
+          <div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nav buttons -->
+    <div class="card">
+      <div class="divider-label section-label">Actions rapides</div>
+      <div class="nav-row">
+        <button class="btn btn-nav" onclick="sendKey('MENU')">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Menu
+        </button>
+        <button class="btn btn-nav orange-tint" onclick="sendKey('HOME')">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Accueil
+        </button>
+        <button class="btn btn-nav" onclick="sendKey('GUIDE')">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Guide
+        </button>
+        <button class="btn btn-nav" onclick="sendKey('BACK')">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>Retour
+        </button>
+      </div>
+      <div class="nav-row" style="margin-top:8px;">
+        <button class="btn btn-nav" onclick="sendKey('PREV')">⏮</button>
+        <button class="btn btn-nav" onclick="sendKey('PLAY_PAUSE')">⏯</button>
+        <button class="btn btn-nav" onclick="sendKey('STOP')">⏹</button>
+        <button class="btn btn-nav" onclick="sendKey('NEXT')">⏭</button>
+      </div>
+    </div>
+
+    <!-- Numpad -->
+    <div class="card">
+      <div class="divider-label section-label">Clavier numérique</div>
+      <div class="numpad">
+        <button class="btn btn-num" onclick="sendKey('1')">1</button>
+        <button class="btn btn-num" onclick="sendKey('2')">2</button>
+        <button class="btn btn-num" onclick="sendKey('3')">3</button>
+        <button class="btn btn-num" onclick="sendKey('4')">4</button>
+        <button class="btn btn-num" onclick="sendKey('5')">5</button>
+        <button class="btn btn-num" onclick="sendKey('6')">6</button>
+        <button class="btn btn-num" onclick="sendKey('7')">7</button>
+        <button class="btn btn-num" onclick="sendKey('8')">8</button>
+        <button class="btn btn-num" onclick="sendKey('9')">9</button>
+        <button class="btn btn-num muted" onclick="sendKey('PRGM_SUIV')">SUIV</button>
+        <button class="btn btn-num" onclick="sendKey('0')">0</button>
+        <button class="btn btn-num muted" onclick="sendKey('PRGM_PREC')">PREC</button>
+      </div>
+    </div>
+
+    <!-- Color keys -->
+    <div class="card">
+      <div class="divider-label section-label">Touches couleurs</div>
+      <div class="color-keys">
+        <button class="btn btn-color btn-red"    onclick="sendKey('RED')">ROUGE</button>
+        <button class="btn btn-color btn-green"  onclick="sendKey('GREEN')">VERT</button>
+        <button class="btn btn-color btn-yellow" onclick="sendKey('YELLOW')">JAUNE</button>
+        <button class="btn btn-color btn-blue"   onclick="sendKey('BLUE')">BLEU</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="help-note">
+    Doit être connecté au même réseau Wi-Fi que la box Orange.
+  </p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY_MAP = {
+  STANDBY:116, MUTE:113, VOL_UP:115, VOL_DOWN:114,
+  CH_UP:402, CH_DOWN:403,
+  UP:103, DOWN:108, LEFT:105, RIGHT:106, OK:28, BACK:8,
+  MENU:139, HOME:140, GUIDE:365,
+  PLAY_PAUSE:164, STOP:128, PREV:412, NEXT:407,
+  RED:403, GREEN:404, YELLOW:405, BLUE:406,
+  '0':11,'1':2,'2':3,'3':4,'4':5,'5':6,'6':7,'7':8,'8':9,'9':10,
+  PRGM_SUIV:407, PRGM_PREC:412
+};
+
+let currentIp = localStorage.getItem('boxIp') || '';
+let connected = false;
+let scanAborted = false;
+let scanRunning = false;
+
+// Restore saved IP
+if (currentIp) {
+  document.getElementById('boxIp').value = currentIp;
+  document.getElementById('connectBanner').style.display = 'none';
+  verifyConnection(currentIp);
+}
+
+function toggleConnect() {
+  const b = document.getElementById('connectBanner');
+  b.style.display = b.style.display === 'none' ? 'flex' : 'none';
+}
+
+async function connectBox() {
+  const ip = document.getElementById('boxIp').value.trim();
+  if (!ip) { showToast('Entrez une adresse IP'); return; }
+  showToast('⏳ Connexion…');
+  const ok = await verifyConnection(ip);
+  if (ok) {
+    currentIp = ip;
+    localStorage.setItem('boxIp', ip);
+    document.getElementById('connectBanner').style.display = 'none';
+    showToast('✅ Box Orange connectée !');
+  } else {
+    showToast('❌ Box introuvable sur ' + ip);
+  }
+}
+
+async function verifyConnection(ip) {
+  try {
+    await fetchWithTimeout(`http://${ip}:8080/remoteControl/cmd?operation=10`, 2500);
+    setConnected(true); return true;
+  } catch {
+    setConnected(false); return false;
+  }
+}
+
+// ── AUTO SCAN ─────────────────────────────────────────────────────────────
+// Strategy: probe the most common Livebox subnets concurrently by batch.
+// The Livebox TV decoder responds on port 8080 to operation=10 (status query).
+// We scan 192.168.0.x, 192.168.1.x, 192.168.2.x and 10.0.0.x in parallel
+// batches of 20 IPs to keep it fast without flooding the network.
+
+function startScan() {
+  if (scanRunning) return;
+  scanAborted = false;
+  scanRunning = true;
+
+  const overlay = document.getElementById('scanOverlay');
+  overlay.classList.add('active', 'scanning');
+  document.getElementById('scanResults').innerHTML = '';
+  document.getElementById('scanBar').style.width = '0%';
+  document.getElementById('scanTitle').textContent = '🔍 Recherche en cours…';
+  document.getElementById('scanSub').textContent = 'Analyse du réseau Wi-Fi local\nCela peut prendre ~15 secondes';
+
+  runScan();
+}
+
+function cancelScan() {
+  scanAborted = true;
+  scanRunning = false;
+  document.getElementById('scanOverlay').classList.remove('active', 'scanning');
+}
+
+async function runScan() {
+  // Build candidate IPs — Orange boxes are almost always on these subnets
+  const subnets = ['192.168.1', '192.168.0', '192.168.2', '10.0.0', '10.0.1'];
+  const candidates = [];
+  // Most likely addresses first: 1-30, then rest
+  const priority = [];
+  for (let i = 1; i <= 30; i++) priority.push(i);
+  for (let i = 31; i <= 254; i++) priority.push(i);
+
+  for (const s of subnets) {
+    for (const h of priority) candidates.push(`${s}.${h}`);
+  }
+
+  const total = candidates.length;
+  let scanned = 0;
+  let found = [];
+  const BATCH = 25;
+
+  for (let i = 0; i < candidates.length; i += BATCH) {
+    if (scanAborted) return;
+    const batch = candidates.slice(i, i + BATCH);
+    const results = await Promise.allSettled(batch.map(ip => probeBox(ip)));
+
+    results.forEach((r, idx) => {
+      scanned++;
+      if (r.status === 'fulfilled' && r.value) {
+        found.push(batch[idx]);
+        addDeviceResult(batch[idx], found.length === 1);
+      }
+    });
+
+    // Update progress bar
+    const pct = Math.round((scanned / total) * 100);
+    document.getElementById('scanBar').style.width = pct + '%';
+
+    // If we found something in first 2 subnets, stop early
+    if (found.length > 0 && scanned > 60) break;
+  }
+
+  scanRunning = false;
+  document.getElementById('scanOverlay').classList.remove('scanning');
+
+  if (found.length === 0) {
+    document.getElementById('scanTitle').textContent = '😕 Aucune box trouvée';
+    document.getElementById('scanSub').textContent = 'Assure-toi d\'être connecté au Wi-Fi\nde ta box Orange, puis réessaie.';
+  } else {
+    document.getElementById('scanTitle').textContent = `✅ ${found.length} box trouvée${found.length > 1 ? 's' : ''}`;
+    document.getElementById('scanSub').textContent = 'Sélectionne ta box pour te connecter.';
+  }
+}
+
+async function probeBox(ip) {
+  try {
+    await fetchWithTimeout(`http://${ip}:8080/remoteControl/cmd?operation=10`, 800);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function addDeviceResult(ip, isFirst) {
+  const container = document.getElementById('scanResults');
+  const item = document.createElement('div');
+  item.className = 'device-item' + (isFirst ? ' highlight' : '');
+  item.innerHTML = `
+    <div class="device-icon">📺</div>
+    <div class="device-info">
+      <div class="device-name">Box Orange TV</div>
+      <div class="device-ip">${ip}</div>
+    </div>
+    ${isFirst ? '<span class="device-badge">RECOMMANDÉ</span>' : ''}
+  `;
+  item.onclick = () => selectDevice(ip);
+  container.appendChild(item);
+}
+
+function selectDevice(ip) {
+  currentIp = ip;
+  localStorage.setItem('boxIp', ip);
+  document.getElementById('boxIp').value = ip;
+  cancelScan();
+  setConnected(true);
+  document.getElementById('connectBanner').style.display = 'none';
+  showToast('✅ Box Orange connectée !');
+}
+
+// ── REMOTE CONTROL ────────────────────────────────────────────────────────
+async function fetchWithTimeout(url, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { signal: ctrl.signal, mode: 'no-cors' });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+function setConnected(state) {
+  connected = state;
+  const pill = document.getElementById('statusPill');
+  const text = document.getElementById('statusText');
+  if (state) {
+    pill.className = 'status-pill connected';
+    text.textContent = 'Connecté';
+  } else {
+    pill.className = 'status-pill';
+    text.textContent = 'Non connecté';
+  }
+}
+
+async function sendKey(keyName) {
+  if (!currentIp) { showToast('Box non connectée'); toggleConnect(); return; }
+  const code = KEY_MAP[keyName];
+  if (!code) return;
+  if (navigator.vibrate) navigator.vibrate(22);
+  try {
+    await fetchWithTimeout(`http://${currentIp}:8080/remoteControl/cmd?operation=01&key=${code}&mode=0`, 2000);
+    fetchWithTimeout(`http://${currentIp}:8080/remoteControl/cmd?operation=01&key=${code}&mode=1`, 2000).catch(()=>{});
+    if (!connected) setConnected(true);
+  } catch {
+    showToast('⚠️ Box injoignable');
+    setConnected(false);
+  }
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+</script>
+</body>
+</html>
